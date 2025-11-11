@@ -1,0 +1,7 @@
+2025-11-11 17:16:20,637 - INFO - 💾 XML guardado en: logs\aBalados_Services,_SL_proforma_25384_20251111_171620.xml
+2025-11-11 17:16:20,638 - INFO - 💾 XML copiado en: responses\xml_25384_20251111_171620.xml
+2025-11-11 17:16:21,764 - INFO - ↳ API raw guardada en: responses\api_25384_20251111_171621.json
+2025-11-11 17:16:21,768 - INFO - 📱 Enlace QR tributario recibido para 25384
+2025-11-11 17:16:21,768 - INFO - ✅ Envío correcto para 25384 (aBalados Services, S.L.)
+2025-11-11 17:16:21,772 - INFO - 📝 Resumen guardado en: responses\summary.json
+2025-11-11 17:16:24,216 - INFO - 🧾 Post-proceso Excel Macro completado (MARK).
