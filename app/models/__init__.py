@@ -1,1 +1,28 @@
-"""\nModelos de datos (dataclasses y validadores) usados por la aplicación.\n\"\"\"\n\nfrom app.models.invoice import (\n    Invoice,\n    InvoiceLine,\n    Customer,\n    InvoiceValidationError,\n    InvoiceProcessingResult,\n)\nfrom app.models.user import User, UserSession\nfrom app.models.history import HistoryEntry, HistoryFilter, HistoryStats\nfrom app.models.offline_queue import OfflineQueueItem\n\n__all__ = [\n    "Invoice",\n    "InvoiceLine",\n    "Customer",\n    "InvoiceValidationError",\n    "InvoiceProcessingResult",\n    "User",\n    "UserSession",\n    "HistoryEntry",\n    "HistoryFilter",\n    "HistoryStats",\n    "OfflineQueueItem",\n]
+"""
+Modelos de datos (dataclasses y validadores) usados por la aplicación.
+"""
+
+from app.models.invoice import (
+    Invoice,
+    InvoiceLine,
+    Customer,
+    InvoiceValidationError,
+    InvoiceProcessingResult,
+)
+from app.models.user import User, UserSession
+from app.models.history import HistoryEntry, HistoryFilter, HistoryStats
+from app.models.offline_queue import OfflineQueueItem
+
+__all__ = [
+    "Invoice",
+    "InvoiceLine",
+    "Customer",
+    "InvoiceValidationError",
+    "InvoiceProcessingResult",
+    "User",
+    "UserSession",
+    "HistoryEntry",
+    "HistoryFilter",
+    "HistoryStats",
+    "OfflineQueueItem",
+]
