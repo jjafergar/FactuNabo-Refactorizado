@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import sqlite3
 from contextlib import contextmanager
-from typing import Iterable, Optional, Sequence, Tuple
+from typing import Iterable, Optional, Sequence, Tuple, Iterator, Any
 
 from app.core.resources import DB_PATH
 from app.core.logging import get_logger
@@ -15,7 +15,7 @@ logger = get_logger("services.database")
 
 
 @contextmanager
-def get_connection(readonly: bool = False):
+def get_connection(readonly: bool = False) -> Iterator[sqlite3.Connection]:
     """
     Devuelve un contexto con conexión a la base de datos.
     Si `readonly` es True, abre la DB en modo inmutable.
@@ -124,7 +124,7 @@ def fetch_all(query: str, params: Optional[Sequence] = None) -> Sequence[Tuple]:
         return cur.fetchall()
 
 
-def fetch_one(query: str, params: Optional[Sequence] = None):
+def fetch_one(query: str, params: Optional[Sequence] = None) -> Optional[Tuple[Any, ...]]:
     with get_connection(readonly=True) as conn:
         cur = conn.cursor()
         cur.execute(query, params or [])
