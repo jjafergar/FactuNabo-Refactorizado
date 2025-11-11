@@ -571,6 +571,13 @@ class MainWindow(QMainWindow):
 
         init_database()
         self.stats_service = StatsService()
+        
+        # Inicializar controladores
+        from app.controllers.main_controller import MainController
+        from app.ui.main_window_logic import MainWindowLogic
+        
+        self.controller = MainController()
+        self.ui_logic = None  # Se inicializará después de init_ui()
 
         self.history_reload_timer = QTimer(self)
         self.history_reload_timer.setSingleShot(True)
@@ -650,6 +657,10 @@ class MainWindow(QMainWindow):
         # --- [FIN NUEVO] ---
 
         self.init_ui()
+        
+        # Inicializar lógica de UI después de crear los widgets
+        self.ui_logic = MainWindowLogic(self)
+        self.ui_logic.setup_connections()
 
         # Atajos de teclado
         self.shortcut_open = QShortcut(QKeySequence("Ctrl+O"), self)
@@ -2644,15 +2655,24 @@ class MainWindow(QMainWindow):
         except (ValueError, TypeError):
             return 0.0
 
-    # [REDISEÑADO] save_summary_to_history para guardar facturas individuales
+    # [REFACTORIZADO] save_summary_to_history ahora usa el controlador
     def save_summary_to_history(self, summary_data: list):
         """
         Procesa el resultado de un envío (summary.json) y guarda una entrada
         por cada factura individual en la BBDD.
+        Delegado al controlador de negocio.
         """
         if not summary_data:
             return
-
+        
+        try:
+            count = self.controller.save_to_history(summary_data, self.current_excel_path)
+            logger.info(f"Guardadas {count} facturas en el historial")
+        except Exception as e:
+            logger.error(f"Error guardando en historial: {e}")
+            self.show_error(f"Error guardando en historial: {e}")
+        
+        # Continuar con el código original para compatibilidad
         records_to_insert = []
         for item in summary_data:
             if not isinstance(item, dict):
