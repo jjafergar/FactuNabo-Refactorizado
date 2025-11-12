@@ -1060,6 +1060,14 @@ class MainWindow(QMainWindow):
         btn_clear.clicked.connect(self.clear_excel_table)
         layout.addWidget(btn_clear)
 
+        # --- Botón de crear factura rectificativa ---
+        self.btn_rectificativa = AnimatedButton("🔄 Crear Rectificativa")
+        self.btn_rectificativa.setToolTip("Crear una factura rectificativa a partir de una factura existente")
+        self.btn_rectificativa.setStyleSheet("padding: 8px 20px; min-height: 32px; font-size: 13px;")
+        self.btn_rectificativa.clicked.connect(self.open_rectificativa_dialog)
+        self.btn_rectificativa.setEnabled(False)  # Deshabilitado hasta que se cargue un Excel
+        layout.addWidget(self.btn_rectificativa)
+
         hint = QLabel("o arrastra el archivo aquí")
         hint.setAlignment(Qt.AlignCenter)
         hint.setStyleSheet(f"color: {COLOR_SECONDARY_TEXT};")
@@ -2023,11 +2031,13 @@ class MainWindow(QMainWindow):
         if self.validate_excel(path):
             self.stepper.set_step(2)
             self.btn_send.setEnabled(True)
+            self.btn_rectificativa.setEnabled(True)  # Habilitar botón de rectificativa
             self.validation_label.setText("✅ Archivo validado correctamente")
             self.validation_label.setStyleSheet(f"color: {COLOR_SUCCESS}; font-weight: bold;")
         else:
             self.stepper.set_step(1)
             self.btn_send.setEnabled(False)
+            self.btn_rectificativa.setEnabled(False)  # Deshabilitar botón de rectificativa
 
             def _fmt_err(e):
                 if isinstance(e, str):
@@ -3619,6 +3629,122 @@ class MainWindow(QMainWindow):
         # Ocultar realmente después de la animación
         QTimer.singleShot(300, self.toast.hide)
         
+    def open_rectificativa_dialog(self):
+        """Abre el diálogo para crear una factura rectificativa"""
+        from app.ui.rectificativa_dialog import RectificativaDialog
+        
+        # Verificar que hay facturas cargadas
+        if not hasattr(self, 'df_factura_historico') or self.df_factura_historico is None or self.df_factura_historico.empty:
+            QMessageBox.warning(
+                self,
+                "Sin facturas",
+                "No hay facturas cargadas. Por favor, carga un archivo Excel primero."
+            )
+            return
+        
+        # Crear y mostrar el diálogo
+        dialog = RectificativaDialog(self, self.df_factura_historico)
+        dialog.factura_created.connect(self.on_rectificativa_created)
+        dialog.exec()
+    
+    def on_rectificativa_created(self, datos_rectificativa: dict):
+        """Maneja la creación de una factura rectificativa"""
+        try:
+            # Obtener la factura original
+            factura_original = datos_rectificativa.get("factura_original")
+            if factura_original is None:
+                raise ValueError("No se proporcionó la factura original")
+            
+            # Crear una copia de la factura original para la rectificativa
+            nueva_factura = factura_original.copy()
+            
+            # Modificar los campos necesarios para la rectificativa
+            tipo_factura = datos_rectificativa.get("tipo_factura", "R4")
+            tipo_rect = datos_rectificativa.get("factura_rectificativa_tipo", "I")
+            num_factura_original = datos_rectificativa.get("factura_rectificativa_numero", "")
+            
+            # Generar un nuevo número de factura para la rectificativa
+            num_original = str(factura_original.get("NumFactura", ""))
+            if tipo_rect == "S":
+                nuevo_num = f"{num_original}-RECT-S"
+            else:
+                nuevo_num = f"{num_original}-RECT-I"
+            
+            nueva_factura["NumFactura"] = nuevo_num
+            nueva_factura["tipo_factura"] = tipo_factura
+            nueva_factura["factura_rectificativa"] = "1"
+            nueva_factura["factura_rectificativa_numero"] = num_factura_original
+            nueva_factura["factura_rectificativa_tipo"] = tipo_rect
+            nueva_factura["factura_rectificativa_ejercicio"] = factura_original.get("ejercicio", "2025")
+            nueva_factura["factura_rectificativa_fecha_emision"] = factura_original.get("fecha_emision", "")
+            
+            # Si es por diferencias (I) y es un abono, poner importes negativos
+            if tipo_rect == "I" and tipo_factura == "R1":
+                # Sugerir que es un abono
+                reply = QMessageBox.question(
+                    self,
+                    "Tipo de rectificativa",
+                    "¿Es una factura de abono (devolucón)? Los importes se pondrán en negativo.",
+                    QMessageBox.Yes | QMessageBox.No,
+                    QMessageBox.Yes
+                )
+                if reply == QMessageBox.Yes:
+                    # Poner importes en negativo
+                    if "base_ad" in nueva_factura:
+                        nueva_factura["base_ad"] = -abs(float(nueva_factura.get("base_ad", 0)))
+                    if "total_ah" in nueva_factura:
+                        nueva_factura["total_ah"] = -abs(float(nueva_factura.get("total_ah", 0)))
+            
+            # Añadir la nueva factura al DataFrame
+            if hasattr(self, 'df_factura_historico') and self.df_factura_historico is not None:
+                # Convertir la serie a DataFrame de una fila
+                nueva_factura_df = pd.DataFrame([nueva_factura])
+                self.df_factura_historico = pd.concat([self.df_factura_historico, nueva_factura_df], ignore_index=True)
+                
+                # También copiar los conceptos de la factura original
+                if hasattr(self, 'df_conceptos_historico') and self.df_conceptos_historico is not None:
+                    # Filtrar conceptos de la factura original
+                    conceptos_originales = self.df_conceptos_historico[
+                        self.df_conceptos_historico["NumFactura"] == num_original
+                    ].copy()
+                    
+                    if not conceptos_originales.empty:
+                        # Cambiar el NumFactura en los conceptos
+                        conceptos_originales["NumFactura"] = nuevo_num
+                        
+                        # Si es abono, poner importes en negativo
+                        if tipo_rect == "I" and tipo_factura == "R1":
+                            if "base_unidad" in conceptos_originales.columns:
+                                conceptos_originales["base_unidad"] = -abs(conceptos_originales["base_unidad"])
+                        
+                        # Añadir al DataFrame de conceptos
+                        self.df_conceptos_historico = pd.concat(
+                            [self.df_conceptos_historico, conceptos_originales],
+                            ignore_index=True
+                        )
+                
+                # Mostrar mensaje de éxito
+                QMessageBox.information(
+                    self,
+                    "Éxito",
+                    f"Factura rectificativa creada correctamente:\n\n"
+                    f"Número: {nuevo_num}\n"
+                    f"Tipo: {tipo_factura}\n"
+                    f"Modalidad: {'Sustitución' if tipo_rect == 'S' else 'Diferencias'}\n\n"
+                    f"La factura se ha añadido a la lista y se enviará junto con las demás."
+                )
+                
+                # Actualizar la tabla de previsualización
+                self.append_log(f"✅ Factura rectificativa {nuevo_num} creada correctamente")
+                
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Error al crear la factura rectificativa:\n{str(e)}"
+            )
+            self.append_log(f"❌ Error al crear factura rectificativa: {e}")
+    
     # ######################################################################
     # FIN DEL BLOQUE CORREGIDO
     # ######################################################################
